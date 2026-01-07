@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoloBoxe - Real Steel Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            overflow: hidden;
+            font-family: 'Teko', sans-serif;
+            color: #fff;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+
+        #input_video { display: none; }
+
+        #output_canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1; /* Le jeu est en fond */
+        }
+
+        /* --- HUD (INTERFACE) --- */
+        #hud_layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10; /* L'interface passe DEVANT le canvas */
+        }
+
+        .health-bar-container {
+            display: flex;
+            justify-content: space-between;
+            padding: 30px;
+            width: 85%;
+            margin: 0 auto;
+        }
+
+        .bar-wrapper { width: 45%; }
+
+        .name-tag {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 0px;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .p-name { color: #3498db; text-align: left; }
+        .e-name { color: #e74c3c; text-align: right; }
+
+        .health-track {
+            height: 25px;
+            background: #222;
+            border: 2px solid #555;
+            transform: skewX(-15deg);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .health-fill {
+            height: 100%;
+            transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        #p-health { background: linear-gradient(to right, #2980b9, #3498db); width: 100%; }
+        #e-health { background: linear-gradient(to left, #c0392b, #e74c3c); width: 100%; float: right; }
+
+        /* --- MENUS & PAUSE --- */
+        #pause-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            pointer-events: auto;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 5px 15px;
+            font-family: 'Teko', sans-serif;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 50;
+        }
+        #pause-btn:hover { background: rgba(255,255,255,0.3); }
+
+        #menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        .menu-box {
+            background: #1a1a1a;
+            border: 2px solid #444;
+            padding: 40px;
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        .menu-title {
+            font-size: 60px;
+            margin: 0 0 30px 0;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #333;
+            border: none;
+            color: #aaa;
+            font-family: 'Teko', sans-serif;
+            font-size: 28px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background: #555; color: #fff; transform: scale(1.05); }
+        .btn.active { background: #e67e22; color: #fff; box-shadow: 0 0 15px #e67e22; }
+
+        #resume-btn { background: #27ae60; color: white; margin-top: 30px; }
+        #resume-btn:hover { background: #2ecc71; }
+
+        /* Ecrans fin */
+        #ko-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            z-index: 90;
+            pointer-events: auto;
+        }
+
+        .ko-text {
+            font-size: 180px;
+            font-weight: 700;
+            line-height: 1;
+            text-shadow: 0 10px 30px rgba(0,0,0,1);
+        }
+
+        #restart-game-btn {
+            background: #3498db;
+            border: none;
+            color: white;
+            padding: 15px 40px;
+            font-family: 'Teko', sans-serif;
+            font-size: 32px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);
+            animation: pulse-btn 1s infinite alternate;
+        }
+        #restart-game-btn:hover {
+            background: #fff;
+            color: #3498db;
+        }
+
+        @keyframes pulse-btn {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            color: #fff;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border: 1px solid #555;
+        }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div id="container">
+        <div id="loading">INITIALISATION DU COMBAT...</div>
+        
+        <div id="hud_layer">
+            <button id="pause-btn">PAUSE (Echap)</button>
+
+            <div class="health-bar-container">
+                <div class="bar-wrapper">
+                    <div class="name-tag p-name">CHALLENGER</div>
+                    <div class="health-track"><div id="p-health" class="health-fill"></div></div>
+                </div>
+                <div class="bar-wrapper">
+                    <div class="name-tag e-name">TITAN BOT</div>
+                    <div class="health-track"><div id="e-health" class="health-fill"></div></div>
+                </div>
+            </div>
+
+            <div id="ko-screen">
+                <div class="ko-text" id="ko-title">K.O.</div>
+                <div class="sub-text" id="ko-msg" style="font-size: 40px;">VICTOIRE</div>
+                <br>
+                <button id="restart-game-btn" onclick="resetGame()">REJOUER</button>
+            </div>
+        </div>
+
+        <!-- Menu Pause -->
+        <div id="menu-overlay">
+            <div class="menu-box">
+                <h2 class="menu-title">PAUSE</h2>
+                <div style="text-align: left; color: #888; margin-bottom: 10px;">DIFFICULTÉ :</div>
+                <button class="btn" id="diff-easy" onclick="setDifficulty('easy')">FACILE</button>
+                <button class="btn active" id="diff-normal" onclick="setDifficulty('normal')">NORMAL</button>
+                <button class="btn" id="diff-hard" onclick="setDifficulty('hard')">DIFFICILE</button>
+                
+                <button class="btn" id="resume-btn" onclick="togglePause()">REPRENDRE LE COMBAT</button>
+            </div>
+        </div>
+
+        <video id="input_video"></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const loadingScreen = document.getElementById('loading');
+    
+    // UI Elements
+    const pHealthBar = document.getElementById('p-health');
+    const eHealthBar = document.getElementById('e-health');
+    const koScreen = document.getElementById('ko-screen');
+    const koTitle = document.getElementById('ko-title');
+    const koMsg = document.getElementById('ko-msg');
+    const menuOverlay = document.getElementById('menu-overlay');
+
+    // --- GAME SETTINGS & STATE ---
+    
+    const SETTINGS = {
+        easy: { botHp: 50, botDmg: 2, botSpeed: 0.03, botHitWindow: 600 },
+        normal: { botHp: 100, botDmg: 5, botSpeed: 0.05, botHitWindow: 1000 },
+        hard: { botHp: 200, botDmg: 12, botSpeed: 0.08, botHitWindow: 1500 }
+    };
+
+    let currentDifficulty = 'normal';
+    let isPaused = false;
+    let gameState = 'playing'; // playing, win, lose
+    
+    let playerHP = 100;
+    let enemyHP = SETTINGS[currentDifficulty].botHp;
+    let enemyMaxHP = SETTINGS[currentDifficulty].botHp;
+    
+    let screenShake = 0;
+    let particles = [];
+
+    const playerHands = []; 
+
+    function resizeCanvas() {
+        canvasElement.width = window.innerWidth;
+        canvasElement.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // --- PAUSE & MENU LOGIC ---
+
+    function togglePause() {
+        if (gameState !== 'playing' && !isPaused) return; 
+        isPaused = !isPaused;
+        menuOverlay.style.display = isPaused ? 'flex' : 'none';
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === "Escape") togglePause();
+    });
+
+    document.getElementById('pause-btn').addEventListener('click', togglePause);
+
+    function setDifficulty(level) {
+        currentDifficulty = level;
+        ['easy', 'normal', 'hard'].forEach(l => {
+            document.getElementById(`diff-${l}`).classList.remove('active');
+        });
+        document.getElementById(`diff-${level}`).classList.add('active');
+        resetGame();
+        togglePause();
+    }
+
+    function resetGame() {
+        gameState = 'playing';
+        playerHP = 100;
+        enemyMaxHP = SETTINGS[currentDifficulty].botHp;
+        enemyHP = enemyMaxHP;
+        koScreen.style.display = 'none';
+        bot.reset();
+        updateHealthUI();
+    }
+
+    function lerp(start, end, factor) {
+        return start + (end - start) * factor;
+    }
+
+    // --- RENDU RÉALISTE ---
+
+    function drawSphere(ctx, x, y, r, colorBase, isMetallic = true) {
+        const lightX = x - r * 0.3;
+        const lightY = y - r * 0.3;
+        const grad = ctx.createRadialGradient(lightX, lightY, r * 0.1, x, y, r);
+        
+        if (isMetallic) {
+            grad.addColorStop(0, '#fff');
+            grad.addColorStop(0.2, colorBase);
+            grad.addColorStop(0.5, '#222');
+            grad.addColorStop(1, '#000');
+        } else {
+            grad.addColorStop(0, '#ffaaaa');
+            grad.addColorStop(0.5, colorBase);
+            grad.addColorStop(1, '#550000');
+        }
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function drawBody(ctx, x, y, w, h, color) {
+        const grad = ctx.createLinearGradient(x - w/2, y, x + w/2, y);
+        grad.addColorStop(0, '#111');
+        grad.addColorStop(0.2, color);
+        grad.addColorStop(0.5, '#fff');
+        grad.addColorStop(0.8, color);
+        grad.addColorStop(1, '#111');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(x - w/2, y - h/2, w, h, 20);
+        ctx.fill();
+    }
+
+    // --- RENDU MAINS (PISTONS) ---
+
+    function drawPistonBone(ctx, x1, y1, x2, y2, thickness, color) {
+        const length = Math.hypot(x2 - x1, y2 - y1);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+
+        ctx.save();
+        ctx.translate(x1, y1);
+        ctx.rotate(angle);
+
+        const grad = ctx.createLinearGradient(0, -thickness/2, 0, thickness/2);
+        grad.addColorStop(0, '#000');
+        grad.addColorStop(0.3, color);
+        grad.addColorStop(0.5, '#fff');
+        grad.addColorStop(0.7, color);
+        grad.addColorStop(1, '#000');
+
+        ctx.fillStyle = grad;
+        const gap = 3;
+        ctx.fillRect(gap, -thickness/2, length - gap*2, thickness);
+        ctx.restore();
+    }
+
+    function drawJoint(ctx, x, y, size) {
+        drawSphere(ctx, x, y, size, '#555', true);
+    }
+
+    // --- CLASSE BOT ---
+
+    class EnemyBot {
+        constructor() { this.reset(); }
+        reset() {
+            this.x = 0; this.y = 0; this.z = 200;
+            this.targetX = 0; this.targetY = 0;
+            this.moveTimer = 0; this.isHit = false; this.hitTimer = 0; this.attackTimer = 0;
+            this.headSize = 70;
+            this.bodySize = { w: 120, h: 140 };
+            this.gloveSize = 45;
+        }
+        update() {
+            if (isPaused) return;
+            const config = SETTINGS[currentDifficulty];
+            this.moveTimer++;
+            if (this.moveTimer > 80) {
+                this.targetX = (Math.random() - 0.5) * 450;
+                this.targetY = (Math.random() - 0.5) * 120;
+                this.moveTimer = 0;
+            }
+            this.x = lerp(this.x, this.targetX, config.botSpeed);
+            this.y = lerp(this.y, this.targetY, config.botSpeed);
+            this.attackTimer++;
+            this.leftGloveZ = -50 + (Math.sin(this.attackTimer * 0.05) * 60);
+            this.rightGloveZ = -50 + (Math.cos(this.attackTimer * 0.07) * 60);
+            if (this.isHit) {
+                this.hitTimer--;
+                if (this.hitTimer <= 0) this.isHit = false;
+            }
+        }
+        draw(ctx) {
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            let shakeX = (Math.random() - 0.5) * screenShake;
+            let shakeY = (Math.random() - 0.5) * screenShake;
+            if (screenShake > 0) screenShake *= 0.9;
+            const fov = 600;
+            const scale = fov / (fov + this.z);
+            const screenX = cx + this.x * scale + shakeX;
+            const screenY = cy + this.y * scale + shakeY;
+
+            const bodyColor = this.isHit ? '#ffaaaa' : '#555';
+            drawBody(ctx, screenX, screenY + 100 * scale, this.bodySize.w * scale, this.bodySize.h * scale, bodyColor);
+
+            const headColor = this.isHit ? '#ff5555' : '#888'; 
+            drawSphere(ctx, screenX, screenY - 60 * scale, this.headSize * scale, headColor, true);
+            
+            // Yeux
+            const eyeY = screenY - 60 * scale;
+            const eyeSize = 15 * scale;
+            const eyeOffset = 25 * scale;
+            ctx.shadowBlur = 20; ctx.shadowColor = '#0ff'; ctx.fillStyle = '#0ff';
+            ctx.beginPath(); ctx.arc(screenX - eyeOffset, eyeY, eyeSize, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(screenX + eyeOffset, eyeY, eyeSize, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // BARRE DE VIE FLOTTANTE (En plus du HUD)
+            this.drawFloatingHealth(ctx, screenX, screenY - 140 * scale, scale);
+
+            this.drawGlove(ctx, cx, cy, -130, 40, this.leftGloveZ); 
+            this.drawGlove(ctx, cx, cy, 130, 40, this.rightGloveZ); 
+
+            this.collisionHead = { x: screenX, y: screenY - 60 * scale, r: this.headSize * scale };
+            this.collisionBody = { x: screenX, y: screenY + 100 * scale, r: this.bodySize.w * 0.6 * scale };
+        }
+
+        drawFloatingHealth(ctx, x, y, scale) {
+            const width = 100 * scale;
+            const height = 10 * scale;
+            const pct = Math.max(0, enemyHP / enemyMaxHP);
+            
+            // Fond
+            ctx.fillStyle = '#333';
+            ctx.fillRect(x - width/2, y, width, height);
+            
+            // Vie
+            ctx.fillStyle = pct > 0.5 ? '#e74c3c' : '#ff0000';
+            ctx.fillRect(x - width/2, y, width * pct, height);
+            
+            // Bordure
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x - width/2, y, width, height);
+        }
+
+        drawGlove(ctx, cx, cy, offsetX, offsetY, offsetZ) {
+            const fov = 600;
+            const gz = this.z + offsetZ;
+            const scale = fov / (fov + gz);
+            const gx = cx + (this.x + offsetX) * scale;
+            const gy = cy + (this.y + offsetY) * scale;
+            const size = this.gloveSize * scale;
+            drawSphere(ctx, gx, gy, size, '#c0392b', false);
+        }
+    }
+
+    const bot = new EnemyBot();
+
+    function updateHealthUI() {
+        const pctP = Math.max(0, (playerHP / 100) * 100);
+        const pctE = Math.max(0, (enemyHP / enemyMaxHP) * 100);
+        pHealthBar.style.width = pctP + '%';
+        eHealthBar.style.width = pctE + '%';
+    }
+
+    function endGame(result) {
+        gameState = result;
+        koScreen.style.display = 'block';
+        if (result === 'win') {
+            koTitle.style.color = '#3498db';
+            koTitle.innerText = "K.O.";
+            koMsg.innerText = "VICTOIRE";
+        } else {
+            koTitle.style.color = '#e74c3c';
+            koTitle.innerText = "ÉCHEC";
+            koMsg.innerText = "VOUS ÊTES K.O.";
+        }
+    }
+
+    // --- MAIN LOOP ---
+
+    function drawEnvironment(ctx) {
+        const w = canvasElement.width;
+        const h = canvasElement.height;
+        const cx = w / 2;
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+        bgGrad.addColorStop(0, '#050505');
+        bgGrad.addColorStop(1, '#1a1a1a');
+        ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, w, h);
+
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.moveTo(0, h); ctx.lineTo(w, h);
+        ctx.lineTo(w * 0.8, h * 0.55); ctx.lineTo(w * 0.2, h * 0.55);
+        ctx.fill();
+
+        ctx.lineWidth = 4; ctx.strokeStyle = '#c0392b'; 
+        const ropeY = [h * 0.5, h * 0.4, h * 0.3];
+        ropeY.forEach((y, i) => {
+            ctx.globalAlpha = 0.5 - (i * 0.1);
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+        });
+        ctx.globalAlpha = 1.0;
+
+        const spot = ctx.createRadialGradient(cx, h*0.4, 50, cx, h*0.8, w * 0.6);
+        spot.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+        spot.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = spot; ctx.fillRect(0,0,w,h);
+    }
+
+    function onResults(results) {
+        loadingScreen.style.display = 'none';
+        if (isPaused) return;
+
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        drawEnvironment(canvasCtx);
+        bot.update();
+        bot.draw(canvasCtx);
+
+        particles.forEach((p, index) => {
+            p.life -= 0.05; p.x += p.vx; p.y += p.vy;
+            canvasCtx.globalAlpha = Math.max(0, p.life);
+            canvasCtx.fillStyle = p.color;
+            canvasCtx.beginPath();
+            canvasCtx.arc(p.x, p.y, Math.random()*3, 0, Math.PI*2);
+            canvasCtx.fill();
+            canvasCtx.globalAlpha = 1.0;
+            if (p.life <= 0) particles.splice(index, 1);
+        });
+
+        if (results.multiHandLandmarks && gameState === 'playing') {
+            for (const landmarks of results.multiHandLandmarks) {
+                const flippedLandmarks = landmarks.map(l => ({ ...l, x: 1 - l.x }));
+
+                // ECHELLE INVERSÉE
+                const p0 = flippedLandmarks[0];
+                const p9 = flippedLandmarks[9];
+                const dx = (p9.x - p0.x) * canvasElement.width;
+                const dy = (p9.y - p0.y) * canvasElement.height;
+                const currentHandSize = Math.hypot(dx, dy);
+
+                const refSize = 100; 
+                const depthScale = Math.min(3.5, Math.max(0.3, (refSize / currentHandSize) * 1.8));
+
+                const cx = p9.x * canvasElement.width;
+                const cy = p9.y * canvasElement.height;
+
+                const getRescaled = (pt) => {
+                    const originalX = pt.x * canvasElement.width;
+                    const originalY = pt.y * canvasElement.height;
+                    return {
+                        x: cx + (originalX - cx) * depthScale,
+                        y: cy + (originalY - cy) * depthScale
+                    };
+                };
+
+                // DESSIN MAINS
+                if (HAND_CONNECTIONS) {
+                    for (const connection of HAND_CONNECTIONS) {
+                        const i1 = connection[0];
+                        const i2 = connection[1];
+                        
+                        const rp1 = getRescaled(flippedLandmarks[i1]);
+                        const rp2 = getRescaled(flippedLandmarks[i2]);
+                        
+                        let thickness = 18 * depthScale; 
+                        if (i1 > 4) thickness = 12 * depthScale; 
+                        
+                        drawPistonBone(canvasCtx, rp1.x, rp1.y, rp2.x, rp2.y, thickness, '#3498db');
+                    }
+                }
+
+                for (let i = 0; i < flippedLandmarks.length; i++) {
+                    const pos = getRescaled(flippedLandmarks[i]);
+                    let size = 10 * depthScale;
+                    if (i === 0) size = 15 * depthScale; 
+                    drawJoint(canvasCtx, pos.x, pos.y, size);
+                }
+
+                // GAME LOGIC
+                const index = results.multiHandLandmarks.indexOf(landmarks);
+                const gloveX = cx; 
+                const gloveY = cy;
+
+                if (!playerHands[index]) playerHands[index] = { x: gloveX, y: gloveY, vx: 0, vy: 0 };
+                const hand = playerHands[index];
+                hand.vx = gloveX - hand.x;
+                hand.vy = gloveY - hand.y;
+                hand.x = gloveX;
+                hand.y = gloveY;
+
+                const speed = Math.hypot(hand.vx, hand.vy);
+                const isPunching = speed > 20;
+
+                if (isPunching && !bot.isHit) {
+                    const hitHead = Math.hypot(gloveX - bot.collisionHead.x, gloveY - bot.collisionHead.y) < bot.collisionHead.r + 50;
+                    const hitBody = Math.hypot(gloveX - bot.collisionBody.x, gloveY - bot.collisionBody.y) < bot.collisionBody.r + 50;
+
+                    if (hitHead || hitBody) {
+                        const dmg = hitHead ? 10 : 5;
+                        enemyHP -= dmg;
+                        bot.isHit = true;
+                        bot.hitTimer = 15;
+                        screenShake = 10;
+                        updateHealthUI();
+                        
+                        for(let i=0; i<8; i++) {
+                            particles.push({
+                                x: gloveX, y: gloveY,
+                                vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20,
+                                life: 1.0, color: '#ffcc00'
+                            });
+                        }
+
+                        if (enemyHP <= 0) {
+                            enemyHP = 0;
+                            endGame('win');
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    setInterval(() => {
+        if (gameState === 'playing' && !isPaused && !bot.isHit) {
+            const settings = SETTINGS[currentDifficulty];
+            if (Math.random() < 0.2) { 
+                 playerHP -= settings.botDmg;
+                 const flash = document.createElement('div');
+                 flash.style.position = 'absolute'; flash.style.top = 0; flash.style.left = 0;
+                 flash.style.width = '100vw'; flash.style.height = '100vh';
+                 flash.style.background = 'red'; flash.style.opacity = 0.3;
+                 flash.style.pointerEvents = 'none'; flash.style.zIndex = 5;
+                 document.body.appendChild(flash);
+                 setTimeout(() => flash.remove(), 100);
+                 updateHealthUI();
+                 if (playerHP <= 0) endGame('lose');
+            }
+        }
+    }, 1000);
+
+    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({image: videoElement}); },
+        width: 1280, height: 720
+    });
+    camera.start();
+
+</script>
+</body>
+</html>
