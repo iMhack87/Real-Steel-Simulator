@@ -44,22 +44,10 @@ Pause: Press ESC or click the "Pause" button to change difficulty.
 
 No complex installation or backend server is required!
 
-Option 1: Run Locally
-
-Clone this repository:
-
-git clone [https://github.com/your-username/holoboxe.git](https://github.com/your-username/holoboxe.git)
-
-
-Navigate to the folder.
-
-Open index.html in any modern web browser (Chrome, Edge, Firefox).
-
-Option 2: Live Demo (GitHub Pages)
-
-(Recommended: Enable GitHub Pages in your repository settings to host it for free!)
-
-[Link to your GitHub Pages Demo]
+Click the green "Code" button
+Download zip
+Unizip
+Double click the index.html
 
 🛠️ Technologies Used
 
@@ -95,4 +83,4 @@ Open a Pull Request.
 
 Distributed under the MIT License. See LICENSE for more information.
 
-Made with ❤️ and code. Don't break your monitor!
+Don't break your monitor!
